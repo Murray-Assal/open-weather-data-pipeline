@@ -1,0 +1,61 @@
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow"]
+      interval: 5s
+      retries: 5
+    volumes:
+      - open_weather_data:/var/lib/postgresql/data
+
+  airflow-init:
+    image: apache/airflow:3.0.1-python3.11
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    command: bash -c "airflow db migrate && airflow users create \
+        --username admin --firstname Airflow --lastname Admin \
+        --role Admin --email admin@example.com --password admin"
+
+  airflow-api-server:
+    image: apache/airflow:3.0.1-python3.11
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    ports:
+      - "8080:8080"
+    command: airflow api-server
+
+  airflow-scheduler:
+    image: apache/airflow:3.0.1-python3.11
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    command: airflow scheduler
+
+  airflow-triggerer:
+    image: apache/airflow:3.0.1-python3.11
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    command: airflow triggerer
+
+volumes:
+  open_weather_data:
