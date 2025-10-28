@@ -1,0 +1,5 @@
+{"timestamp":"2025-10-28T12:26:21.112506Z","level":"info","event":"DAG bundles loaded: dags-folder","logger":"airflow.dag_processing.bundles.manager.DagBundlesManager","filename":"manager.py","lineno":179}
+{"timestamp":"2025-10-28T12:26:21.113705Z","level":"info","event":"Filling up the DagBag from /opt/airflow/dags/open_weather_map_dag.py","logger":"airflow.models.dagbag.DagBag","filename":"dagbag.py","lineno":593}
+{"timestamp":"2025-10-28T12:26:21.854523Z","level":"info","event":"Transformed weather data into DataFrame","logger":"unusual_prefix_6aa07b989e9bb88d8279bcee7861b87bdad000e6_open_weather_map_dag","filename":"open_weather_map_dag.py","lineno":112}
+{"timestamp":"2025-10-28T12:26:21.911220Z","level":"info","event":"Loaded weather data into PostgreSQL","logger":"unusual_prefix_6aa07b989e9bb88d8279bcee7861b87bdad000e6_open_weather_map_dag","filename":"open_weather_map_dag.py","lineno":153}
+{"timestamp":"2025-10-28T12:26:21.911860Z","level":"info","event":"Done. Returned value was: None","logger":"airflow.task.operators.airflow.providers.standard.decorators.python._PythonDecoratedOperator","filename":"python.py","lineno":218}

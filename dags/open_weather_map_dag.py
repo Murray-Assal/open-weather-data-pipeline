@@ -2,14 +2,14 @@ from airflow.sdk import task, dag
 from airflow.providers.http.hooks.http import HttpHook
 from airflow.providers.postgres.hooks.postgres import PostgresHook
 from datetime import datetime, timedelta
+from airflow.models import Variable
+from psycopg2.extras import execute_values
 import pandas as pd
-import json
-from datetime import timedelta
 import logging
 
 lat=30.044420 # Latitude for Cairo, Egypt
 lon=31.235712 # Longitude for Cairo, Egypt
-api_key='e305ae64603916b5e3d4dd01c678526e' # Replace with your OpenWeatherMap API key
+api_key=Variable.get("open_weather_map_api_key") # Replace with your OpenWeatherMap API key
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -25,6 +25,7 @@ default_args = {
     dag_id='open_weather_map_dag',
     default_args=default_args,
     description='A DAG to fetch weather data from OpenWeatherMap API and store it in PostgreSQL',
+    schedule='@weekly',
     start_date=datetime(2025, 10, 28),
     catchup=False,
 )
@@ -33,7 +34,7 @@ def open_weather_map_dag():
     @task()
     def extract_weather_data():
         '''
-        Extract weather data from OpenWeatherMap API every day for the summer of 2025.
+        Extract weather data from OpenWeatherMap API for the specified location for the last 5 days.
         The input data should look similar to this:
         {
             "lat": 30.0444,
@@ -83,6 +84,7 @@ def open_weather_map_dag():
                 logger.info(f"Extracted weather data for {date_in_loop.strftime('%Y-%m-%d')}")
             else:
                 logger.error(f"Failed to fetch data for {date_in_loop.strftime('%Y-%m-%d')}: {response.text}")
+                raise Exception("API request failed")
             date_in_loop += delta
         return weather_data
 
@@ -94,8 +96,8 @@ def open_weather_map_dag():
         for entry in weather_data:
             record = {
                 'timezone': entry['timezone'],
-                'sunrise': entry['data'][0]['sunrise'],
-                'sunset': entry['data'][0]['sunset'],
+                'sunrise': datetime.fromtimestamp(entry['data'][0]['sunrise']),
+                'sunset': datetime.fromtimestamp(entry['data'][0]['sunset']),
                 'temp': entry['data'][0]['temp'],
                 'feels_like': entry['data'][0]['feels_like'],
                 'pressure': entry['data'][0]['pressure'],
@@ -110,12 +112,13 @@ def open_weather_map_dag():
             records.append(record)
         weather_df = pd.DataFrame(records)
         logger.info("Transformed weather data into DataFrame")
+
         # Load the transformed data into PostgreSQL
-        pg_hook = PostgresHook(postgres_conn_id='postgres_default')
+        pg_hook = PostgresHook(postgres_conn_id='postgres_database')
         conn = pg_hook.get_conn()
         cursor = conn.cursor()
         create_table_query = '''
-        CREATE TABLE IF NOT EXISTS weather_data (
+        CREATE TABLE IF NOT EXISTS cairo_weather_data (
             id SERIAL PRIMARY KEY,
             timezone VARCHAR(50),
             sunrise TIMESTAMP,
@@ -129,24 +132,24 @@ def open_weather_map_dag():
             visibility INT,
             wind_speed FLOAT,
             wind_deg INT,
-            sky VARCHAR(100)
+            sky VARCHAR(100),
+            CONSTRAINT unique_sunrise UNIQUE (timezone, sunrise)
             );
         '''
         cursor.execute(create_table_query)
         conn.commit()
-        for _, row in weather_df.iterrows():
-            insert_query = '''
-            INSERT INTO weather_data (
+
+        insert_query = '''
+            INSERT INTO cairo_weather_data (
                 timezone, sunrise, sunset, temp, feels_like,
                 pressure, humidity, dew_point, clouds,
                 visibility, wind_speed, wind_deg, sky
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+            ) VALUES %s
+            ON CONFLICT (timezone, sunrise) DO NOTHING;
             '''
-            cursor.execute(insert_query, (
-                row['timezone'], row['sunrise'], row['sunset'], row['temp'], row['feels_like'],
-                row['pressure'], row['humidity'], row['dew_point'], row['clouds'],
-                row['visibility'], row['wind_speed'], row['wind_deg'], row['sky']
-            ))
+
+        values = [tuple(x) for x in weather_df.to_numpy()]
+        execute_values(cursor, insert_query, values)
         conn.commit()
         cursor.close()
         conn.close()

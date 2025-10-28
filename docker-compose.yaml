@@ -98,6 +98,23 @@ services:
       retries: 5
       start_period: 5s
     restart: always
+  
+  postgres-data:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: weather_data
+    ports:
+      - "5433:5432"   # Expose to host on port 5433
+    volumes:
+      - postgres-data-volume:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 10s
+      retries: 5
+      start_period: 5s
+    restart: always
 
   airflow-apiserver:
     <<: *airflow-common
@@ -274,3 +291,4 @@ services:
 
 volumes:
   postgres-db-volume:
+  postgres-data-volume:
