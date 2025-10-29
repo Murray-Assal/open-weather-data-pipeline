@@ -13,7 +13,7 @@ A weather‑forecast data ETL pipeline to extract, clean and store it in a Postg
 - [Usage](#usage)
 - [Directory Structure](#directory-structure)
 - [Technologies](#technologies)
-- [Contribution](#Contribution)
+- [Contribution](#Contributing)
 - [Contact](#contact)
 
 ## Overview
