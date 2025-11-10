@@ -1,0 +1,53 @@
+name: Run Airflow Pipeline
+
+on:
+  workflow_dispatch:   # manually trigger
+  schedule:
+    - cron: "0 3 * * *"  # every day at 3 AM UTC (optional)
+
+jobs:
+  run-pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: airflow
+          POSTGRES_PASSWORD: airflow
+          POSTGRES_DB: airflow
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U airflow"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Compose
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and start Airflow stack
+        run: |
+          docker compose up -d --build
+          sleep 60  # wait for services to be ready
+
+      - name: Run DAG
+        run: |
+          docker compose exec -T airflow-cli \
+            airflow dags trigger open_weather_map_dag
+          sleep 60
+          docker compose exec -T airflow-cli \
+            airflow dags state open_weather_map_dag $(date +%Y-%m-%d)
+
+      - name: View logs (optional)
+        run: docker compose logs
+
+      - name: Shutdown stack
+        if: always()
+        run: docker compose down -v
