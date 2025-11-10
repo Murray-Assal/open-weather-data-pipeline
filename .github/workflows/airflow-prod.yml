@@ -82,7 +82,18 @@ jobs:
               echo "DAG completed successfully!"
               exit 0
             elif [[ "$STATUS" == "failed" ]]; then
-              echo "DAG failed!"
+              echo "DAG failed! Fetching task logs..."
+              # List all tasks
+              TASKS=$(docker compose run --rm airflow-cli airflow tasks list $DAG_ID | awk 'NR>2 {print $1}' | grep -vE '^\s*$')
+              for TASK_ID in $TASKS; do
+                STATE=$(docker compose run --rm airflow-cli airflow tasks state $DAG_ID $TASK_ID $RUN_ID)
+                echo "Task $TASK_ID: $STATE"
+                if [[ "$STATE" == "failed" ]]; then
+                  echo "---------- LOGS FOR FAILED TASK: $TASK_ID ----------"
+                  docker compose run --rm airflow-cli airflow tasks logs $DAG_ID $TASK_ID $RUN_ID || true
+                  echo "----------------------------------------------------"
+                fi
+              done
               exit 1
             fi
             COUNTER=$((COUNTER + 1))
