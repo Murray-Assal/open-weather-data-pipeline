@@ -37,13 +37,18 @@ jobs:
           docker compose up -d --build
           sleep 60  # wait for services to be ready
 
-      - name: Run DAG
+      - name: Start Airflow stack
         run: |
-          docker compose exec -T airflow-scheduler \
+          docker compose --profile debug up -d --build
+          echo "Waiting for Airflow to parse DAGs..."
+          sleep 90
+      
+      - name: List available DAGs
+        run: docker compose run --rm airflow-cli airflow dags list
+      
+      - name: Trigger DAG
+        run: docker compose run --rm airflow-cli \
             airflow dags trigger open_weather_map_dag
-          sleep 60
-          docker compose exec -T airflow-cli \
-            airflow dags state open_weather_map_dag $(date +%Y-%m-%d)
 
       - name: View logs (optional)
         run: docker compose logs
