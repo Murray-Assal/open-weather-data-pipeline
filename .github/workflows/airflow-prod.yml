@@ -39,7 +39,7 @@ jobs:
 
       - name: Run DAG
         run: |
-          docker compose exec -T airflow-cli \
+          docker compose exec -T airflow-scheduler \
             airflow dags trigger open_weather_map_dag
           sleep 60
           docker compose exec -T airflow-cli \
