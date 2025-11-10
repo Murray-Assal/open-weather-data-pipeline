@@ -48,7 +48,7 @@ jobs:
         run: |
           docker compose --profile debug up -d --build
           echo "Waiting 90s for Airflow services to initialize..."
-          sleep 90
+          sleep 30
 
       - name: Verify DAGs exist
         run: |
