@@ -47,8 +47,7 @@ jobs:
         run: docker compose run --rm airflow-cli airflow dags list
       
       - name: Trigger DAG
-        run: docker compose run --rm airflow-cli \
-            airflow dags trigger open_weather_map_dag
+        run: docker compose run --rm airflow-cli airflow dags trigger open_weather_map_dag
 
       - name: View logs (optional)
         run: docker compose logs
