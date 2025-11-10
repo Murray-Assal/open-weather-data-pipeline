@@ -16,7 +16,7 @@ jobs:
         image: postgres:16
         env:
           POSTGRES_USER: airflow
-          POSTGRES_PASSWORD: airflow
+          POSTGRES_PASSWORD: ${{ secrets.META_DATA_PASSWORD }}
           POSTGRES_DB: airflow
         options: >-
           --health-cmd "pg_isready -U airflow"
@@ -29,7 +29,7 @@ jobs:
         image: postgres:16
         env:
           POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
+          POSTGRES_PASSWORD: ${{ secrets.DATA_WAREHOUSE_PASSWORD }}
           POSTGRES_DB: weather_data
         options: >-
           --health-cmd "pg_isready -U postgres"
