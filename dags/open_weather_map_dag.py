@@ -26,7 +26,7 @@ default_args = {
     dag_id='open_weather_map_dag',
     default_args=default_args,
     description='A DAG to fetch weather data from OpenWeatherMap API and store it in PostgreSQL',
-    schedule='@weekly',
+    schedule= None, #External trigger only
     start_date=datetime(2025, 10, 28),
     catchup=False,
 )
