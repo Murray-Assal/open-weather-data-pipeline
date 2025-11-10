@@ -28,6 +28,26 @@ jobs:
           sleep 30
           docker compose -f docker-compose.yaml run --rm airflow-cli airflow dags list
 
+      - name: Test environment variable
+        run: |
+          echo "Checking OPEN_WEATHER_APP_API..."
+          docker compose run --rm airflow-cli printenv | grep OPEN_WEATHER_APP_API
+
+      - name: Test Postgres connection exists
+        run: |
+          echo "Checking Postgres connection..."
+          docker compose run --rm airflow-cli airflow connections list | grep postgres_database || \
+          docker compose run --rm airflow-cli \
+            airflow connections add postgres_database \
+            --conn-uri postgresql+psycopg2://postgres:postgres@postgres-data:5432/weather_data
+
+      - name: Test OpenWeatherMap connection exists
+        run: |
+          echo "Checking OpenWeatherMap connection..."
+          docker compose run --rm airflow-cli airflow connections list | grep open_weather_map_api || \
+          docker compose run --rm airflow-cli \
+            airflow connections add open_weather_map_api --conn-uri "https://api.openweathermap.org"
+      
       - name: Unpause DAG
         run: docker compose run --rm airflow-cli airflow dags unpause open_weather_map_dag
 
