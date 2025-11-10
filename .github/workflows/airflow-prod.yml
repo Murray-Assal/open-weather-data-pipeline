@@ -3,7 +3,7 @@ name: Run Airflow Pipeline
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 3 * * *"  # optional: daily at 3 AM UTC
+    - cron: "0 0 * * 0"  # optional: weekly at 12 AM UTC
 
 jobs:
   run-airflow-pipeline:
@@ -47,7 +47,7 @@ jobs:
       - name: Build and start Airflow stack
         run: |
           docker compose --profile debug up -d --build
-          echo "Waiting 90s for Airflow services to initialize..."
+          echo "Waiting 30s for Airflow services to initialize..."
           sleep 30
 
       - name: Verify DAGs exist
@@ -79,8 +79,8 @@ jobs:
           echo "Triggered DAG $DAG_ID with run_id: $RUN_ID"
 
           # Poll for DAG run status
-          MAX_RETRIES=60
-          SLEEP_SECONDS=10
+          MAX_RETRIES=10
+          SLEEP_SECONDS=5
           COUNTER=0
           while [ $COUNTER -lt $MAX_RETRIES ]; do
             STATUS=$(docker compose run --rm airflow-cli \
@@ -102,7 +102,7 @@ jobs:
             exit 1
           fi
 
-      - name: View Airflow scheduler logs (optional)
+      - name: View Airflow scheduler logs
         run: docker compose logs airflow-scheduler
 
       - name: Shut down Airflow stack
