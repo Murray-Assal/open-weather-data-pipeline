@@ -4,12 +4,13 @@ from airflow.providers.postgres.hooks.postgres import PostgresHook
 from datetime import datetime, timedelta
 from airflow.models import Variable
 from psycopg2.extras import execute_values
+import os
 import pandas as pd
 import logging
 
 lat=30.044420 # Latitude for Cairo, Egypt
 lon=31.235712 # Longitude for Cairo, Egypt
-api_key=${{ secrets.OPEN_WEATHER_APP_API }} # Replace with your OpenWeatherMap API key
+api_key= os.environ.get("OPEN_WEATHER_APP_API") # Replace with your OpenWeatherMap API key
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
