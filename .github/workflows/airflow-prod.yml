@@ -61,6 +61,8 @@ jobs:
           docker compose run --rm airflow-cli airflow dags list-import-errors || true
 
       - name: Trigger DAG and wait for completion
+        env:
+          OPEN_WEATHER_APP_API: ${{ secrets.OPEN_WEATHER_APP_API }}
         run: |
           DAG_ID=open_weather_map_dag
           
