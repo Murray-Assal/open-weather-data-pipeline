@@ -28,6 +28,9 @@ jobs:
           sleep 30
           docker compose -f docker-compose.yaml run --rm airflow-cli airflow dags list
 
+      - name: Unpause DAG
+        run: docker compose run --rm airflow-cli airflow dags unpause open_weather_map_dag
+
       - name: Trigger DAG and get run_id
         id: trigger_dag
         run: |
@@ -47,8 +50,8 @@ jobs:
         run: |
           DAG_ID=open_weather_map_dag
           RUN_ID=${{ steps.trigger_dag.outputs.run_id }}
-          MAX_RETRIES=60
-          SLEEP_SECONDS=10
+          MAX_RETRIES=10
+          SLEEP_SECONDS=5
           COUNTER=0
 
           echo "Polling DAG run status..."
