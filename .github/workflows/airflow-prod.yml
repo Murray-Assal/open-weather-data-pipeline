@@ -31,7 +31,7 @@ jobs:
       - name: Test environment variable
         run: |
           echo "Checking OPEN_WEATHER_APP_API..."
-          docker compose run --rm airflow-cli printenv | grep OPEN_WEATHER_APP_API
+          docker compose run --rm airflow-cli bash -c 'echo $OPEN_WEATHER_APP_API
 
       - name: Test Postgres connection exists
         run: |
