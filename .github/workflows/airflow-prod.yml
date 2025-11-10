@@ -1,32 +1,44 @@
 name: Run Airflow Pipeline
 
 on:
-  workflow_dispatch:   # manually trigger
+  workflow_dispatch:
   schedule:
-    - cron: "0 3 * * *"  # every day at 3 AM UTC (optional)
+    - cron: "0 3 * * *"  # optional: daily at 3 AM UTC
 
 jobs:
-  run-pipeline:
+  run-airflow-pipeline:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
 
     services:
+      # Airflow metadata DB
       postgres:
         image: postgres:16
         env:
           POSTGRES_USER: airflow
           POSTGRES_PASSWORD: airflow
           POSTGRES_DB: airflow
-        ports:
-          - 5432:5432
         options: >-
           --health-cmd "pg_isready -U airflow"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
 
+      # Data warehouse DB
+      postgres-data:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: weather_data
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up Docker Compose
@@ -34,24 +46,62 @@ jobs:
 
       - name: Build and start Airflow stack
         run: |
-          docker compose up -d --build
-          sleep 60  # wait for services to be ready
-
-      - name: Start Airflow stack
-        run: |
           docker compose --profile debug up -d --build
-          echo "Waiting for Airflow to parse DAGs..."
+          echo "Waiting 90s for Airflow services to initialize..."
           sleep 90
-      
-      - name: List available DAGs
-        run: docker compose run --rm airflow-cli airflow dags list
-      
-      - name: Trigger DAG
-        run: docker compose run --rm airflow-cli airflow dags trigger open_weather_map_dag
 
-      - name: View logs (optional)
-        run: docker compose logs
+      - name: Verify DAGs exist
+        run: |
+          echo "Listing DAGs..."
+          docker compose run --rm airflow-cli airflow dags list
 
-      - name: Shutdown stack
+      - name: Check DAG import errors
+        run: |
+          echo "Checking for import errors..."
+          docker compose run --rm airflow-cli airflow dags list-import-errors || true
+
+      - name: Trigger DAG and wait for completion
+        run: |
+          DAG_ID=open_weather_map_dag
+          
+          # Trigger the DAG and get run_id
+          RUN_ID=$(docker compose run --rm airflow-cli \
+            airflow dags trigger -r github_action_run $DAG_ID --conf '{}' --output json | jq -r '.dag_run_id')
+          
+          if [ -z "$RUN_ID" ]; then
+            echo "Failed to trigger DAG $DAG_ID"
+            exit 1
+          fi
+
+          echo "Triggered DAG $DAG_ID with run_id: $RUN_ID"
+
+          # Poll for DAG run status
+          MAX_RETRIES=60
+          SLEEP_SECONDS=10
+          COUNTER=0
+          while [ $COUNTER -lt $MAX_RETRIES ]; do
+            STATUS=$(docker compose run --rm airflow-cli \
+              airflow dags state $DAG_ID $RUN_ID)
+            echo "DAG run status: $STATUS"
+            if [[ "$STATUS" == "success" ]]; then
+              echo "DAG $DAG_ID completed successfully."
+              break
+            elif [[ "$STATUS" == "failed" ]]; then
+              echo "DAG $DAG_ID failed."
+              exit 1
+            fi
+            COUNTER=$((COUNTER + 1))
+            sleep $SLEEP_SECONDS
+          done
+
+          if [ $COUNTER -ge $MAX_RETRIES ]; then
+            echo "DAG $DAG_ID did not finish within expected time."
+            exit 1
+          fi
+
+      - name: View Airflow scheduler logs (optional)
+        run: docker compose logs airflow-scheduler
+
+      - name: Shut down Airflow stack
         if: always()
         run: docker compose down -v
