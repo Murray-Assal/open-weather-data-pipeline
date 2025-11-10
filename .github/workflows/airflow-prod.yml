@@ -6,105 +6,69 @@ on:
     - cron: "0 0 * * 0"  # optional: weekly at 12 AM UTC
 
 jobs:
-  run-airflow-pipeline:
+  run-airflow-dag:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
-
-    services:
-      # Airflow metadata DB
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: airflow
-          POSTGRES_PASSWORD: ${{ secrets.META_DATA_PASSWORD }}
-          POSTGRES_DB: airflow
-        options: >-
-          --health-cmd "pg_isready -U airflow"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-      # Data warehouse DB
-      postgres-data:
-        image: postgres:16
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: ${{ secrets.DATA_WAREHOUSE_PASSWORD }}
-          POSTGRES_DB: weather_data
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
+    env:
+      OPEN_WEATHER_APP_API: ${{ secrets.OPEN_WEATHER_APP_API }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up Docker Compose
-        uses: docker/setup-buildx-action@v3
+        run: docker compose -f docker-compose.yml up -d postgres postgres-data
 
-      - name: Build and start Airflow stack
+      - name: Build and start Airflow services
         run: |
-          docker compose --profile debug up -d --build
-          echo "Waiting 30s for Airflow services to initialize..."
+          docker compose -f docker-compose.yml build
+          docker compose -f docker-compose.yml up -d airflow-scheduler airflow-triggerer airflow-dag-processor airflow-apiserver airflow-init
+
+      - name: Wait for scheduler and DAGs to be ready
+        run: |
+          echo "Waiting 30s for scheduler to pick up DAGs..."
           sleep 30
+          docker compose -f docker-compose.yml run --rm airflow-cli airflow dags list
 
-      - name: Verify DAGs exist
-        run: |
-          echo "Listing DAGs..."
-          docker compose run --rm airflow-cli airflow dags list
-
-      - name: Check DAG import errors
-        run: |
-          echo "Checking for import errors..."
-          docker compose run --rm airflow-cli airflow dags list-import-errors || true
-
-      - name: Trigger DAG and wait for completion
-        env:
-          OPEN_WEATHER_APP_API: ${{ secrets.OPEN_WEATHER_APP_API }}
+      - name: Trigger DAG and get run_id
+        id: trigger_dag
         run: |
           DAG_ID=open_weather_map_dag
-          
-          # Trigger the DAG and get run_id
+          echo "Triggering DAG $DAG_ID..."
           RUN_ID=$(docker compose run --rm airflow-cli \
-          airflow dags trigger -r github_action_run $DAG_ID --conf '{}' --output json \
-          | jq -r '.[0].dag_run_id')
-          
+            airflow dags trigger -r github_action_run $DAG_ID --conf '{}' --output json \
+            | jq -r '.[0].dag_run_id')
           if [ -z "$RUN_ID" ]; then
-            echo "Failed to trigger DAG $DAG_ID"
+            echo "Failed to trigger DAG"
             exit 1
           fi
+          echo "Triggered DAG run_id: $RUN_ID"
+          echo "run_id=$RUN_ID" >> $GITHUB_OUTPUT
 
-          echo "Triggered DAG $DAG_ID with run_id: $RUN_ID"
-
-          # Poll for DAG run status
-          MAX_RETRIES=10
-          SLEEP_SECONDS=5
+      - name: Wait for DAG run to complete
+        run: |
+          DAG_ID=open_weather_map_dag
+          RUN_ID=${{ steps.trigger_dag.outputs.run_id }}
+          MAX_RETRIES=60
+          SLEEP_SECONDS=10
           COUNTER=0
+
+          echo "Polling DAG run status..."
           while [ $COUNTER -lt $MAX_RETRIES ]; do
-            STATUS=$(docker compose run --rm airflow-cli \
-              airflow dags state $DAG_ID $RUN_ID)
+            STATUS=$(docker compose run --rm airflow-cli airflow dags state $DAG_ID $RUN_ID)
             echo "DAG run status: $STATUS"
             if [[ "$STATUS" == "success" ]]; then
-              echo "DAG $DAG_ID completed successfully."
-              break
+              echo "DAG completed successfully!"
+              exit 0
             elif [[ "$STATUS" == "failed" ]]; then
-              echo "DAG $DAG_ID failed."
+              echo "DAG failed!"
               exit 1
             fi
             COUNTER=$((COUNTER + 1))
             sleep $SLEEP_SECONDS
           done
 
-          if [ $COUNTER -ge $MAX_RETRIES ]; then
-            echo "DAG $DAG_ID did not finish within expected time."
-            exit 1
-          fi
+          echo "DAG did not complete within expected time."
+          exit 1
 
-      - name: View Airflow scheduler logs
-        run: docker compose logs airflow-scheduler
-
-      - name: Shut down Airflow stack
+      - name: Tear down Airflow services
         if: always()
-        run: docker compose down -v
+        run: docker compose -f docker-compose.yml down -v
