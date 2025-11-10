@@ -68,7 +68,8 @@ jobs:
           
           # Trigger the DAG and get run_id
           RUN_ID=$(docker compose run --rm airflow-cli \
-            airflow dags trigger -r github_action_run $DAG_ID --conf '{}' --output json | jq -r '.dag_run_id')
+          airflow dags trigger -r github_action_run $DAG_ID --conf '{}' --output json \
+          | jq -r '.[0].dag_run_id')
           
           if [ -z "$RUN_ID" ]; then
             echo "Failed to trigger DAG $DAG_ID"
