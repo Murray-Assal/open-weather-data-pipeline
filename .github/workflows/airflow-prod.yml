@@ -15,18 +15,18 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Docker Compose
-        run: docker compose -f docker-compose.yml up -d postgres postgres-data
+        run: docker compose -f docker-compose.yaml up -d postgres postgres-data
 
       - name: Build and start Airflow services
         run: |
-          docker compose -f docker-compose.yml build
-          docker compose -f docker-compose.yml up -d airflow-scheduler airflow-triggerer airflow-dag-processor airflow-apiserver airflow-init
+          docker compose -f docker-compose.yaml build
+          docker compose -f docker-compose.yaml up -d airflow-scheduler airflow-triggerer airflow-dag-processor airflow-apiserver airflow-init
 
       - name: Wait for scheduler and DAGs to be ready
         run: |
           echo "Waiting 30s for scheduler to pick up DAGs..."
           sleep 30
-          docker compose -f docker-compose.yml run --rm airflow-cli airflow dags list
+          docker compose -f docker-compose.yaml run --rm airflow-cli airflow dags list
 
       - name: Trigger DAG and get run_id
         id: trigger_dag
@@ -71,4 +71,4 @@ jobs:
 
       - name: Tear down Airflow services
         if: always()
-        run: docker compose -f docker-compose.yml down -v
+        run: docker compose -f docker-compose.yaml down -v
