@@ -9,7 +9,7 @@ import logging
 
 lat=30.044420 # Latitude for Cairo, Egypt
 lon=31.235712 # Longitude for Cairo, Egypt
-api_key=Variable.get("open_weather_map_api_key") # Replace with your OpenWeatherMap API key
+api_key=${{ secrets.OPEN_WEATHER_APP_API }} # Replace with your OpenWeatherMap API key
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
