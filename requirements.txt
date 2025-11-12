@@ -1,5 +1,6 @@
 # requirements.txt  (for Dockerfile.base)
-apache-airflow-providers-postgres
+apache-airflow-providers-databricks
+databricks-sql-connector
 psycopg2-binary
 pandas
 sqlalchemy
