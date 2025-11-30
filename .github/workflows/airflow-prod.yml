@@ -3,7 +3,7 @@ name: Run Airflow Pipeline
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 0 * * 0"  # optional: weekly at 12 AM UTC
+   # - cron: "0 0 * * 0"  # optional: weekly at 12 AM UTC
 
 jobs:
   run-airflow-dag:
